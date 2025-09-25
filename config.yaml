@@ -1,0 +1,303 @@
+# USD/BRL Pipeline Configuration
+# Main configuration file for the data pipeline
+
+# API Configuration
+apis:
+  bcb:
+    base_url: "https://olinda.bcb.gov.br/olinda/servico"
+    timeout: 30
+    retry_attempts: 3
+    retry_delay: 2
+    endpoints:
+      ptax: "/PTAX/versao/v1/odata"
+      sgs: "https://api.bcb.gov.br/dados/serie/bcdata.sgs"
+    
+  fred:
+    api_key: "${FRED_API_KEY}"  # Set in environment variable
+    base_url: "https://api.stlouisfed.org/fred"
+    timeout: 30
+    series_ids:
+      fed_funds: "FEDFUNDS"
+      us_cpi: "CPIAUCSL"
+      us_core_cpi: "CPILFESL"
+      us_gdp: "GDP"
+      us_unemployment: "UNRATE"
+      us_10y_treasury: "GS10"
+      us_2y_treasury: "GS2"
+      us_m2: "M2SL"
+    
+  yahoo:
+    timeout: 30
+    tickers:
+      dxy: "DX-Y.NYB"
+      vix: "^VIX"
+      usd_brl: "USDBRL=X"
+      brent: "BZ=F"
+      wti: "CL=F"
+      soybeans: "ZS=F"
+      corn: "ZC=F"
+      sugar: "SB=F"
+      coffee: "KC=F"
+      gold: "GC=F"
+      copper: "HG=F"
+      vale: "VALE"
+      sp500: "^GSPC"
+      emerging_markets: "EEM"
+    
+  alpha_vantage:
+    api_key: "${ALPHA_VANTAGE_API_KEY}"
+    base_url: "https://www.alphavantage.co/query"
+    calls_per_minute: 5
+    
+# Data Collection Settings
+collection:
+  start_date: "2014-01-01"
+  end_date: null  # null means today
+  frequency: "daily"
+  market_close_hour: 18  # BRT
+  batch_size: 100
+  parallel_workers: 5
+  cache_ttl_hours: 1
+  
+# Feature Engineering Parameters
+features:
+  # Lag periods for time series features
+  lag_periods: [1, 2, 5, 10, 22, 44, 66]
+  
+  # Rolling window sizes (in days)
+  rolling_windows: [5, 10, 22, 44, 66]
+  
+  # Technical indicators settings
+  technical:
+    sma_periods: [5, 10, 21, 50, 200]
+    ema_periods: [12, 26]
+    rsi_period: 14
+    macd_fast: 12
+    macd_slow: 26
+    macd_signal: 9
+    bb_period: 20
+    bb_std: 2
+    
+  # Brazilian export weights for commodity index
+  commodity_weights:
+    oil: 0.162
+    soybeans: 0.159
+    iron_ore: 0.080
+    food: 0.050
+    sugar: 0.025
+    coffee: 0.020
+    
+# Data Validation Rules
+validation:
+  # Valid ranges for key variables
+  ranges:
+    usd_brl:
+      min: 1.0
+      max: 10.0
+    selic:
+      min: 0.0
+      max: 25.0
+    fed_funds:
+      min: 0.0
+      max: 10.0
+    volatility:
+      min: 0.0
+      max: 2.0
+    daily_returns:
+      min: -0.15
+      max: 0.15
+      
+  # Maximum allowed missing data percentage
+  max_missing_pct: 5.0
+  
+  # Required columns that must always be present
+  required_columns:
+    - "usd_brl_ptax_close"
+    - "selic_rate"
+    - "fed_funds_rate"
+    - "dxy_index"
+    - "real_interest_differential"
+    
+  # Expected correlations (for sanity checks)
+  expected_correlations:
+    - columns: ["real_interest_differential", "usd_brl_ptax_close"]
+      range: [-0.6, -0.3]
+    - columns: ["dxy_index", "usd_brl_ptax_close"]
+      range: [0.4, 0.8]
+    - columns: ["risk_sentiment_score", "usd_brl_ptax_close"]
+      range: [0.3, 0.7]
+      
+# Output Configuration
+output:
+  base_path: "data"
+  subdirs:
+    raw: "raw"
+    processed: "processed"
+    features: "features"
+    cache: "cache"
+    reports: "reports"
+    
+  formats:
+    - csv
+    - parquet
+    - hdf5
+    
+  compression:
+    csv: "gzip"
+    parquet: "snappy"
+    
+  file_naming:
+    pattern: "usd_brl_{tier}_{date}_{version}"
+    date_format: "%Y%m%d"
+    
+# Database Configuration
+database:
+  # Main database for processed data
+  main:
+    type: "postgresql"
+    host: "${DB_HOST}"
+    port: 5432
+    database: "usd_brl_pipeline"
+    username: "${DB_USER}"
+    password: "${DB_PASSWORD}"
+    
+  # Cache database
+  cache:
+    type: "redis"
+    host: "${REDIS_HOST}"
+    port: 6379
+    db: 0
+    password: "${REDIS_PASSWORD}"
+    
+  # Backup database
+  backup:
+    type: "sqlite"
+    path: "data/backup/usd_brl_backup.db"
+    
+# Pipeline Scheduling
+scheduling:
+  # Daily data collection
+  daily_collection:
+    enabled: true
+    time: "19:00"  # BRT
+    timezone: "America/Sao_Paulo"
+    retry_on_failure: true
+    max_retries: 3
+    
+  # Weekly validation report
+  weekly_validation:
+    enabled: true
+    day: "sunday"
+    time: "22:00"
+    
+  # Monthly backup
+  monthly_backup:
+    enabled: true
+    day: 1
+    time: "03:00"
+    
+# Monitoring and Alerts
+monitoring:
+  # Metrics collection
+  metrics:
+    enabled: true
+    prometheus_port: 9090
+    
+  # Alert thresholds
+  alerts:
+    data_drift_threshold: 0.2
+    missing_data_threshold: 0.1
+    api_failure_threshold: 5
+    pipeline_duration_max_minutes: 30
+    
+  # Notification settings
+  notifications:
+    email:
+      enabled: true
+      smtp_server: "${SMTP_SERVER}"
+      smtp_port: 587
+      sender: "${EMAIL_SENDER}"
+      recipients:
+        - "${EMAIL_RECIPIENT}"
+    slack:
+      enabled: false
+      webhook_url: "${SLACK_WEBHOOK}"
+      
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "json"
+  
+  handlers:
+    console:
+      enabled: true
+      level: "INFO"
+    file:
+      enabled: true
+      level: "DEBUG"
+      path: "logs/pipeline.log"
+      max_bytes: 10485760  # 10MB
+      backup_count: 5
+    error_file:
+      enabled: true
+      level: "ERROR"
+      path: "logs/errors.log"
+      
+# Performance Settings
+performance:
+  # Memory management
+  chunk_size: 10000
+  max_memory_gb: 8
+  
+  # Parallel processing
+  n_workers: 4
+  thread_pool_size: 10
+  
+  # Caching
+  enable_caching: true
+  cache_size_mb: 500
+  
+# Circuit Breaker Settings
+circuit_breaker:
+  failure_threshold: 5
+  recovery_timeout: 60
+  expected_exception_types:
+    - "ConnectionError"
+    - "Timeout"
+    - "HTTPError"
+    
+# Feature Tiers Configuration
+feature_tiers:
+  tier1:
+    weight: 0.40
+    features:
+      - "usd_brl_ptax_close"
+      - "selic_rate"
+      - "fed_funds_rate"
+      - "dxy_index"
+      - "real_interest_differential"
+      - "usd_brl_implied_volatility"
+      
+  tier2:
+    weight: 0.30
+    features:
+      - "brazilian_commodity_index"
+      - "ipca_monthly_yoy"
+      - "us_cpi_yoy"
+      - "capital_flows_net"
+      - "brazil_fiscal_balance"
+      
+  tier3:
+    weight: 0.20
+    features:
+      - "risk_sentiment_score"
+      - "carry_trade_attractiveness"
+      - "cot_sentiment_aggregate"
+      - "correlation_emerging_markets"
+      
+  tier4:
+    weight: 0.10
+    features:
+      - "technical_indicators"
+      - "seasonal_patterns"
+      - "event_dummies"
