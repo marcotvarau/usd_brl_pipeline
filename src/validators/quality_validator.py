@@ -9,8 +9,8 @@ from typing import Dict, List, Optional, Any, Tuple
 import logging
 from datetime import datetime, timedelta
 from scipy import stats
-import great_expectations as ge
-from great_expectations.dataset import PandasDataset
+# import great_expectations as ge
+# from great_expectations.dataset import PandasDataset
 
 
 class QualityValidator:

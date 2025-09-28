@@ -144,24 +144,24 @@ class PipelineOrchestrator:
         
         # Initialize processors
         self.processors = {
-            'feature_engineer': FeatureEngineer(self.config, logger=self.logger),
-            'technical': TechnicalIndicatorProcessor(self.config, logger=self.logger),
-            'temporal': TemporalProcessor(self.config, logger=self.logger),
-            'cleaner': DataCleaner(self.config, logger=self.logger)
+            'feature_engineer': FeatureEngineer(self.config),
+            'technical': TechnicalIndicatorProcessor(self.config),
+            'temporal': TemporalProcessor(self.config),
+            'cleaner': DataCleaner(self.config)
         }
         
         # Initialize validators
         self.validators = {
-            'quality': QualityValidator(self.config, logger=self.logger),
-            'drift': DriftMonitor(self.config, logger=self.logger),
-            'integrity': IntegrityChecker(self.config, logger=self.logger)
+            'quality': QualityValidator(self.config),
+            'drift': DriftMonitor(self.config),
+            'integrity': IntegrityChecker(self.config)
         }
         
         # Initialize exporters
         self.exporters = {
-            'csv': CSVExporter(self.config, logger=self.logger),
-            'parquet': ParquetExporter(self.config, logger=self.logger),
-            'database': DatabaseExporter(self.config, logger=self.logger)
+            'csv': CSVExporter(self.config),
+            'parquet': ParquetExporter(self.config),
+            'database': DatabaseExporter(self.config)
         }
         
         # Initialize utilities

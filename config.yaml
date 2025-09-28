@@ -13,7 +13,7 @@ apis:
       sgs: "https://api.bcb.gov.br/dados/serie/bcdata.sgs"
     
   fred:
-    api_key: "${FRED_API_KEY}"  # Set in environment variable
+    api_key: "$476f9240322767a0793e80d8fcdb3c44"  # Set in environment variable
     base_url: "https://api.stlouisfed.org/fred"
     timeout: 30
     series_ids:
